@@ -1,59 +1,163 @@
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
+# Learning Management System (LMS) API
 
-<p align="center">
-<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
-</p>
+A RESTful API for an online learning platform built with **Laravel 11** and **Laravel Sanctum**. The system supports three user roles (student, instructor, admin) and covers the full lifecycle of an online course: creation, content structuring, enrollment, progress tracking, quizzes, reviews, and certification.
 
-## About Laravel
+---
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
+## Tech Stack
 
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
+| Component | Technology |
+|---|---|
+| Framework | Laravel 11 |
+| Authentication | Laravel Sanctum (Bearer Token) |
+| Database | PostgreSQL |
+| Primary Keys | UUID (across all tables) |
+| API Style | RESTful JSON API |
 
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
+---
 
-## Learning Laravel
+## Core Features
 
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework. You can also check out [Laravel Learn](https://laravel.com/learn), where you will be guided through building a modern Laravel application.
+### User Management
+- Registration, login, logout (token-based via Sanctum)
+- Email verification
+- Password reset / change password
+- Profile management (bio, phone, profile image)
+- Three roles: `user` (student), `instructor`, `admin`
+- Account activation status (`is_active`)
 
-If you don't feel like reading, [Laracasts](https://laracasts.com) can help. Laracasts contains thousands of video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
+### Course Catalog
+- **Categories** — course categories with slugs, icons, active status
+- **Courses** — owned by an instructor, linked to a category, with price, level, thumbnail, and preview video
+- **Sections** — ordered content groups within a course
+- **Lessons** — ordered lessons within a section (video URL + text content, preview flag)
 
-## Laravel Sponsors
+### Enrollment & Progress
+- Students enroll in published courses
+- Per-lesson watch/completion tracking (`Progress`)
+- Automatic course progress percentage calculation based on completed lessons
+- Automatic enrollment completion detection
 
-We would like to extend our thanks to the following sponsors for funding Laravel development. If you are interested in becoming a sponsor, please visit the [Laravel Partners program](https://partners.laravel.com).
+### Quizzes & Assessments
+- One quiz per section, with configurable passing score, time limit, and allowed attempts
+- Multiple-choice questions with one correct answer per question
+- **Section locking**: a student cannot access a section until they pass the quiz of the previous section
+- Quiz attempts are graded server-side; correct answers are never exposed to the client before submission
 
-### Premium Partners
+### Reviews
+- One review (rating + comment) per student per course
+- Restricted to enrolled students only
+- On-demand rating average/count computation
 
-- **[Vehikl](https://vehikl.com)**
-- **[Tighten Co.](https://tighten.co)**
-- **[Kirschbaum Development Group](https://kirschbaumdevelopment.com)**
-- **[64 Robots](https://64robots.com)**
-- **[Curotec](https://www.curotec.com/services/technologies/laravel)**
-- **[DevSquad](https://devsquad.com/hire-laravel-developers)**
-- **[Redberry](https://redberry.international/laravel-development)**
-- **[Active Logic](https://activelogic.com)**
+### Certificates
+- Automatically issued when a student completes 100% of a course
+- Unique, human-readable certificate numbers (e.g. `CERT-2026-A1B2C3D4`)
+- Public certificate verification endpoint (no authentication required)
 
-## Contributing
+### Localization
+- Full English/Arabic support for API response messages and validation errors
+- Language selected via the `Accept-Language` request header
 
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
+---
 
-## Code of Conduct
+## Architecture
 
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
+The codebase follows a layered architecture to keep controllers thin and business logic reusable and testable.
 
-## Security Vulnerabilities
+```
+Request → FormRequest (validation) → Controller → Service (business logic) → Model
+                                          ↓
+                                      Resource (response shaping)
+```
 
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
+| Layer | Responsibility |
+|---|---|
+| **Form Requests** | Input validation and request-level authorization |
+| **Controllers** | HTTP orchestration only — delegates to Services, formats responses via `ApiResponse` trait |
+| **Services** | All business logic, queries, and side effects (e.g. slug generation, progress recalculation, certificate issuance) |
+| **Policies** | Ownership/authorization checks (e.g. "is this instructor the owner of this course?") |
+| **Resources** | Shape and control what data is exposed in API responses |
 
-## License
+### Key Design Decisions
 
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+- **`CoursePolicy` is reused** across `Course`, `Section`, `Lesson`, `Quiz`, and `Question` authorization checks (ownership is always derived from the parent course), avoiding a separate policy per entity.
+- **Route Model Binding with `scopeBindings()`** is used on all nested resource routes (e.g. `courses/{course}/sections/{section}/lessons/{lesson}`) to guarantee that child resources actually belong to their parent in the URL — preventing cross-resource ID tampering.
+- **Two separate Question resources** exist by design:
+  - `QuestionResource` — never exposes the correct answer (used while a student is taking a quiz)
+  - `QuestionWithAnswerResource` — exposes correct answers (used for instructor management and post-submission review)
+- **Certificates are never created directly via an endpoint.** They are issued automatically by `CertificateService` when `ProgressService` detects a course has reached 100% completion.
+
+---
+
+## Database Schema Overview
+
+All tables use **UUID primary keys** and (where applicable) `SoftDeletes`.
+
+---
+
+## Authentication & Authorization
+
+- **Sanctum Bearer Tokens** — all protected endpoints require an `Authorization: Bearer {token}` header.
+- **Roles** (`user`, `instructor`, `admin`) gate access to management endpoints (e.g. only instructors/admins can create courses; only admins can manage categories).
+- **Ownership checks** (via Policies or manual `authorizeOwnership()` helpers) ensure users can only modify their own resources (their courses, their enrollments, their reviews, etc.), regardless of role.
+
+---
+
+## Middleware
+
+| Alias | Purpose |
+|---|---|
+| `auth:sanctum` | Authenticates the request via Bearer token |
+| `active` | Blocks access if the user's account has been deactivated |
+| `role:{role}` | Restricts access to a specific role (e.g. `role:admin`) |
+| `verified` | Requires a verified email address (applied to sensitive actions like enrollment) |
+| `throttle:{max},{minutes}` | Rate limits sensitive endpoints (login, register, password reset, quiz attempts, reviews, certificate verification) |
+
+Registered in `bootstrap/app.php`:
+
+---
+
+## Localization
+
+The API responds in English or Arabic based on the `Accept-Language` request header:
+
+```
+Accept-Language: ar
+```
+---
+
+## Installation
+
+```bash
+# Clone and install dependencies
+composer install
+
+# Environment setup
+cp .env.example .env
+php artisan key:generate
+
+# Configure your .env — database, mail, frontend URL, etc.
+# DB_CONNECTION=pgsql
+# FRONTEND_URL=http://localhost:3000
+
+# Run migrations
+php artisan migrate
+
+# (Optional) seed the database
+php artisan db:seed
+
+# Serve the application
+php artisan serve
+```
+
+### Required `.env` values
+
+| Key | Notes |
+|---|---|
+| `APP_DEBUG` | Must be `false` in production |
+| `APP_ENV` | `local` for development, `production` for deployment |
+| `DB_CONNECTION` | `pgsql` |
+| `FRONTEND_URL` | Used for CORS configuration |
+| `MAIL_MAILER` | `log` for local dev, real SMTP driver for production |
+
+---
