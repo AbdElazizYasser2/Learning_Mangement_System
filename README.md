@@ -2,7 +2,7 @@
 
 A RESTful API for an online learning platform built with **Laravel 12** and **Laravel Sanctum**. The system supports three user roles (student, instructor, admin) and covers the full lifecycle of an online course: creation, content structuring, enrollment, progress tracking, quizzes, reviews, and certification.
 
-Work in Progress — This project is still under active development. Planned additions include: Redis (caching/queues), payment gateway integration, Docker setup for local development and deployment, and further localization coverage. Contributions and structure may change as these are added.
+Work in Progress This project is still under active development. Planned additions include: Redis (caching/queues), payment gateway integration, Docker setup for local development and deployment, and further localization coverage. Contributions and structure may change as these are added.
 
 ---
 
